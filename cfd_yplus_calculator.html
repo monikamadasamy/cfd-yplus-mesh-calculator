@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CFD y⁺ & Mesh Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-deep:      #050a12;
+    --bg-panel:     #0b1422;
+    --bg-card:      #0f1c2e;
+    --bg-card2:     #0a1628;
+    --accent:       #00d4ff;
+    --accent2:      #00ff9d;
+    --accent3:      #ff6b35;
+    --accent4:      #a855f7;
+    --warn:         #fbbf24;
+    --danger:       #f87171;
+    --border:       rgba(0,212,255,0.18);
+    --border2:      rgba(0,255,157,0.15);
+    --text:         #cfe8ff;
+    --text-dim:     #7a9bbf;
+    --text-muted:   #4a6a8a;
+    --glow:         0 0 20px rgba(0,212,255,0.25);
+    --glow2:        0 0 20px rgba(0,255,157,0.2);
+    --radius:       10px;
+    --radius-lg:    16px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Exo 2', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Animated grid background ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridScroll 20s linear infinite;
+  }
+  @keyframes gridScroll { to { background-position: 40px 40px; } }
+
+  /* ── Floating orbs ── */
+  .orb {
+    position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; filter: blur(80px); opacity: 0.12;
+  }
+  .orb-1 { width: 400px; height: 400px; background: #00d4ff; top: -100px; left: -100px; animation: drift 18s ease-in-out infinite alternate; }
+  .orb-2 { width: 300px; height: 300px; background: #00ff9d; bottom: -80px; right: -80px; animation: drift 14s ease-in-out infinite alternate-reverse; }
+  .orb-3 { width: 250px; height: 250px; background: #a855f7; top: 40%; left: 60%; animation: drift 22s ease-in-out infinite alternate; }
+  @keyframes drift { from { transform: translate(0,0); } to { transform: translate(40px,30px); } }
+
+  /* ── Layout ── */
+  .wrapper { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 20px 60px; }
+
+  /* ── Header ── */
+  header {
+    text-align: center; padding: 56px 20px 36px;
+  }
+  .header-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,255,157,0.1));
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  header h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(2.2rem, 5vw, 3.8rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+    background: linear-gradient(135deg, #ffffff 30%, #00d4ff 65%, #00ff9d 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin-bottom: 12px;
+  }
+  header p {
+    color: var(--text-dim); font-size: 1rem; font-weight: 300; max-width: 600px; margin: 0 auto 12px;
+  }
+  .software-tags { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .stag {
+    background: rgba(0,212,255,0.08); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 14px;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.72rem;
+    color: var(--accent); letter-spacing: 0.08em;
+  }
+
+  /* ── Section labels ── */
+  .section-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 18px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::before {
+    content: ''; display: block; width: 30px; height: 1px; background: var(--accent); opacity: 0.6;
+  }
+
+  /* ── Main grid ── */
+  .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 10px; }
+  @media (max-width: 768px) { .main-grid { grid-template-columns: 1fr; } }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 26px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+  .card:hover { border-color: rgba(0,212,255,0.35); }
+  .card.green::before { background: linear-gradient(90deg, transparent, var(--accent2), transparent); }
+  .card.green { border-color: var(--border2); }
+  .card-title {
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 1.1rem;
+    color: #fff; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+  }
+  .card-title .icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(0,212,255,0.05));
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 1rem;
+  }
+  .card.green .card-title .icon {
+    background: linear-gradient(135deg, rgba(0,255,157,0.2), rgba(0,255,157,0.05));
+    border-color: var(--border2);
+  }
+
+  /* ── Inputs ── */
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.82rem; font-weight: 600; color: var(--text-dim);
+    margin-bottom: 7px; letter-spacing: 0.03em;
+  }
+  .field label .unit {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem; color: var(--accent); opacity: 0.8;
+    background: rgba(0,212,255,0.08); padding: 1px 7px; border-radius: 4px;
+  }
+  .hint { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 6px; font-style: italic; }
+  input[type="number"], select {
+    width: 100%; background: var(--bg-deep);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: var(--radius); padding: 10px 14px;
+    color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 0.9rem;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: none; -webkit-appearance: none;
+  }
+  input[type="number"]:focus, select:focus {
+    border-color: var(--accent); box-shadow: var(--glow);
+  }
+  select { cursor: pointer; }
+  select option { background: var(--bg-panel); }
+
+  /* preset buttons */
+  .yplus-presets { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .preset-btn {
+    background: rgba(0,212,255,0.07); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 14px;
+    color: var(--accent); font-family: 'Share Tech Mono', monospace; font-size: 0.8rem;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .preset-btn:hover, .preset-btn.active {
+    background: rgba(0,212,255,0.18); border-color: var(--accent); color: #fff;
+  }
+
+  /* ── Calculate button ── */
+  .calc-btn-wrap { margin-top: 26px; }
+  .calc-btn {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #00d4ff, #00a8cc);
+    border: none; border-radius: var(--radius); cursor: pointer;
+    font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; color: #050a12;
+    position: relative; overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(0,212,255,0.35);
+  }
+  .calc-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,212,255,0.5); }
+  .calc-btn:active { transform: translateY(0); }
+  .calc-btn::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    pointer-events: none;
+  }
+
+  /* ── Output section ── */
+  .output-section { margin-top: 24px; }
+  .output-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 520px) { .output-grid { grid-template-columns: 1fr; } }
+  .output-card {
+    background: var(--bg-card2);
+    border: 1px solid rgba(0,212,255,0.12);
+    border-radius: var(--radius);
+    padding: 16px;
+    position: relative;
+    transition: border-color 0.3s, transform 0.2s;
+  }
+  .output-card:hover { border-color: rgba(0,212,255,0.3); transform: translateY(-2px); }
+  .output-card .oc-label {
+    font-size: 0.72rem; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .output-card .oc-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.4rem; font-weight: 700;
+    color: var(--accent);
+    line-height: 1.2; margin-bottom: 4px;
+  }
+  .output-card .oc-sub { font-size: 0.72rem; color: var(--text-muted); }
+  .output-card .oc-hint {
+    margin-top: 8px; font-size: 0.72rem; color: var(--text-dim);
+    border-top: 1px solid rgba(0,212,255,0.1); padding-top: 8px; line-height: 1.5;
+  }
+  .output-card.highlight { border-color: rgba(0,255,157,0.3); }
+  .output-card.highlight .oc-value { color: var(--accent2); }
+  .output-card.highlight::before {
+    content: '★ KEY OUTPUT'; position: absolute; top: 8px; right: 10px;
+    font-size: 0.6rem; font-family: 'Share Tech Mono', monospace;
+    color: var(--accent2); letter-spacing: 0.1em; opacity: 0.7;
+  }
+
+  /* ── Reynolds badge ── */
+  .re-badge {
+    display: inline-block; padding: 3px 12px; border-radius: 100px;
+    font-size: 0.72rem; font-family: 'Share Tech Mono', monospace;
+    margin-top: 6px; letter-spacing: 0.08em;
+  }
+  .re-laminar    { background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.4); color: #d8a0ff; }
+  .re-transition { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.4); color: #fbbf24; }
+  .re-turbulent  { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.4); color: #f87171; }
+
+  /* ── Turbulence model box ── */
+  .turb-box {
+    margin-top: 20px;
+    background: linear-gradient(135deg, rgba(0,255,157,0.06), rgba(0,212,255,0.06));
+    border: 1px solid rgba(0,255,157,0.2);
+    border-radius: var(--radius); padding: 18px;
+  }
+  .turb-box .tb-label { font-size: 0.7rem; color: var(--accent2); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px; }
+  .turb-box .tb-model { font-family: 'Rajdhani', sans-serif; font-size: 1.3rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .turb-box .tb-reason { font-size: 0.8rem; color: var(--text-dim); line-height: 1.55; }
+
+  /* ── Warnings ── */
+  .warnings-box { margin-top: 14px; }
+  .warn-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: rgba(251,191,36,0.07); border: 1px solid rgba(251,191,36,0.25);
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
+    font-size: 0.8rem; color: #fde68a; line-height: 1.5;
+  }
+  .warn-item.danger { background: rgba(248,113,113,0.07); border-color: rgba(248,113,113,0.25); color: #fca5a5; }
+  .warn-item.info   { background: rgba(0,212,255,0.07); border-color: rgba(0,212,255,0.2); color: #bae6fd; }
+  .warn-icon { font-size: 1rem; flex-shrink: 0; }
+
+  /* ── Schematic ── */
+  .schematic-wrap {
+    margin-top: 24px;
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+  }
+  .schematic-title { font-size: 0.78rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 16px; text-align: center; }
+  svg.schematic { display: block; margin: 0 auto; width: 100%; max-width: 480px; height: auto; }
+
+  /* ── Accordion (Assumptions) ── */
+  .accordion {
+    margin-top: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .acc-header {
+    background: var(--bg-card2); padding: 14px 18px;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+    font-size: 0.85rem; font-weight: 600; color: var(--accent);
+    transition: background 0.2s;
+  }
+  .acc-header:hover { background: rgba(0,212,255,0.08); }
+  .acc-arrow { transition: transform 0.3s; }
+  .acc-body {
+    max-height: 0; overflow: hidden; transition: max-height 0.4s ease;
+    background: var(--bg-deep);
+  }
+  .acc-body.open { max-height: 400px; }
+  .acc-body ul { padding: 16px 20px; list-style: none; }
+  .acc-body ul li {
+    padding: 5px 0; font-size: 0.82rem; color: var(--text-dim);
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .acc-body ul li::before { content: '◆'; font-size: 0.5rem; color: var(--accent); margin-top: 5px; flex-shrink: 0; }
+
+  /* ── Full-width panels ── */
+  .full-panel { margin-top: 22px; }
+  .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 16px; }
+  .info-item {
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .info-item .ii-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .info-item .ii-title { font-size: 0.85rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .info-item .ii-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+
+  /* ── Disclaimer / footer ── */
+  .disclaimer {
+    margin-top: 36px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--radius-lg); padding: 22px 28px;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .disclaimer-icon { font-size: 1.4rem; flex-shrink: 0; opacity: 0.7; margin-top: 2px; }
+  .disclaimer p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; }
+  .disclaimer p strong { color: var(--text-dim); }
+  footer {
+    text-align: center; padding: 30px 20px 20px;
+    font-size: 0.78rem; color: var(--text-muted); line-height: 1.7;
+    position: relative; z-index: 1;
+  }
+  footer .footer-tagline {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem; font-weight: 600; color: var(--accent);
+    margin-bottom: 6px; display: block;
+  }
+
+  /* ── placeholder state ── */
+  .placeholder-msg {
+    text-align: center; padding: 40px 20px;
+    color: var(--text-muted); font-size: 0.85rem; line-height: 1.7;
+  }
+  .placeholder-msg .ph-icon { font-size: 2.5rem; display: block; margin-bottom: 12px; opacity: 0.4; }
+
+  /* ── Tooltip ── */
+  [data-tip] { position: relative; cursor: help; }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    background: #0f1c2e; border: 1px solid var(--border);
+    color: var(--text); font-size: 0.72rem; font-family: 'Exo 2', sans-serif;
+    padding: 7px 12px; border-radius: 6px; white-space: pre-wrap; max-width: 240px;
+    pointer-events: none; opacity: 0; transition: opacity 0.2s;
+    z-index: 100; line-height: 1.5; text-align: left; font-weight: 400;
+  }
+  [data-tip]:hover::after { opacity: 1; }
+
+  /* ── Fade-in ── */
+  .fade-in { animation: fadeUp 0.4s ease both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Separator */
+  .sep { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 28px 0; }
+
+  /* BL growth rate block */
+  .bl-extras { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .bl-chip {
+    background: rgba(0,255,157,0.07); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 5px 13px;
+    font-family: 'Share Tech Mono', monospace; font-size: 0.75rem;
+    color: var(--accent2);
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<div class="wrapper">
+
+  <!-- ═══════════════════════════════════ HEADER ═══════════════════════════════════ -->
+  <header>
+    <div class="header-badge">CFD Pre-Processing Tool · v2.0</div>
+    <h1>y⁺ &amp; Near-Wall<br>Mesh Calculator</h1>
+    <p>Translate flow physics into precise near-wall mesh parameters — bridging theory and real-world meshing decisions.</p>
+    <div class="software-tags">
+      <span class="stag">ANSYS Fluent</span>
+      <span class="stag">OpenFOAM</span>
+      <span class="stag">STAR-CCM+</span>
+      <span class="stag">RANS / LES</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════ MAIN GRID ═══════════════════════════════════ -->
+  <div class="main-grid">
+
+    <!-- ─── LEFT COLUMN: Inputs ─── -->
+    <div>
+      <!-- Flow Properties -->
+      <div class="card">
+        <div class="section-label">Inputs</div>
+        <div class="card-title">
+          <span class="icon">🌊</span> Flow Properties
+        </div>
+
+        <div class="field">
+          <label>Free-Stream Velocity, U <span class="unit">m/s</span></label>
+          <div class="hint">e.g. 10–100 m/s for aerodynamics. High values (>100 m/s) may enter compressible regime.</div>
+          <input type="number" id="velocity" placeholder="e.g. 30" min="0.001" step="any" />
+        </div>
+        <div class="field">
+          <label>Fluid Density, ρ <span class="unit">kg/m³</span></label>
+          <div class="hint">Air at sea level ≈ 1.225 kg/m³ · Water ≈ 998 kg/m³</div>
+          <input type="number" id="density" placeholder="e.g. 1.225" min="0.001" step="any" />
+        </div>
+        <div class="field">
+          <label>Dynamic Viscosity, μ <span class="unit">Pa·s</span></label>
+          <div class="hint">Air ≈ 1.8×10⁻⁵ Pa·s · Water ≈ 1.0×10⁻³ Pa·s</div>
+          <input type="number" id="viscosity" placeholder="e.g. 1.8e-5" min="1e-10" step="any" />
+        </div>
+
+        <div class="sep"></div>
+        <div class="card-title" style="margin-bottom:14px;">
+          <span class="icon">📐</span> Geometry
+        </div>
+
+        <div class="field">
+          <label>Flow Type</label>
+          <select id="flowtype">
+            <option value="external">External Flow (flat plate, airfoil, car…)</option>
+            <option value="internal">Internal Flow (pipe, duct, channel…)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label id="length-label">Characteristic Length, L <span class="unit">m</span></label>
+          <div class="hint" id="length-hint">Chord / plate length for external flow.</div>
+          <input type="number" id="length" placeholder="e.g. 1.0" min="0.001" step="any" />
+        </div>
+
+        <div class="sep"></div>
+        <div class="card-title" style="margin-bottom:14px;">
+          <span class="icon">🎯</span> Target y⁺
+        </div>
+
+        <div class="field">
+          <label>Desired y⁺ value</label>
+          <div class="hint">Preset: 1 → resolve viscous sublayer; 30–300 → wall functions</div>
+          <input type="number" id="yplus" placeholder="e.g. 1" min="0.1" step="any" />
+          <div class="yplus-presets">
+            <button class="preset-btn" data-val="1">y⁺ = 1</button>
+            <button class="preset-btn" data-val="5">y⁺ = 5</button>
+            <button class="preset-btn" data-val="30">y⁺ = 30</button>
+            <button class="preset-btn" data-val="100">y⁺ = 100</button>
+          </div>
+        </div>
+
+        <div class="calc-btn-wrap">
+          <button class="calc-btn" onclick="calculate()">⚡ Calculate Mesh Parameters</button>
+        </div>
+      </div>
+
+      <!-- Assumptions Accordion -->
+      <div class="card" style="margin-top:20px;">
+        <div class="card-title" style="margin-bottom:8px;"><span class="icon">ℹ️</span> Engineering Assumptions</div>
+        <div class="accordion">
+          <div class="acc-header" onclick="toggleAcc(this)">
+            Assumptions Used in Calculations
+            <span class="acc-arrow">▼</span>
+          </div>
+          <div class="acc-body">
+            <ul>
+              <li>Turbulent, wall-bounded flow (correlations not valid for laminar regimes)</li>
+              <li>Smooth wall — no surface roughness effects</li>
+              <li>Zero pressure gradient (flat-plate / fully-developed approximation)</li>
+              <li>Incompressible flow: Mach number &lt; 0.3 recommended</li>
+              <li>Empirical skin-friction correlations (Prandtl / Blasius)</li>
+              <li>Boundary layer estimated via Prandtl's 1/7-power law</li>
+              <li>Results are for preliminary estimation; final mesh should be validated via sensitivity study</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── RIGHT COLUMN: Outputs ─── -->
+    <div>
+      <div class="card green" id="output-panel">
+        <div class="section-label" style="color:var(--accent2);">Outputs</div>
+        <div class="card-title">
+          <span class="icon" style="background:linear-gradient(135deg,rgba(0,255,157,0.2),rgba(0,255,157,0.05));border-color:var(--border2);">📊</span>
+          Computed Mesh Parameters
+        </div>
+
+        <div id="output-content">
+          <div class="placeholder-msg">
+            <span class="ph-icon">🔬</span>
+            Enter your flow parameters and click <strong>Calculate</strong> to see near-wall mesh recommendations.
+          </div>
+        </div>
+      </div>
+
+      <!-- Near-wall schematic -->
+      <div class="schematic-wrap">
+        <div class="schematic-title">Near-Wall Mesh Schematic</div>
+        <svg class="schematic" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg">
+          <!-- Wall -->
+          <rect x="0" y="185" width="480" height="20" fill="rgba(0,212,255,0.12)" stroke="rgba(0,212,255,0.4)" stroke-width="1"/>
+          <!-- Wall hatch -->
+          <defs>
+            <pattern id="hatch" patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="10" stroke="rgba(0,212,255,0.25)" stroke-width="1.5"/>
+            </pattern>
+          </defs>
+          <rect x="0" y="188" width="480" height="17" fill="url(#hatch)"/>
+          <text x="240" y="202" text-anchor="middle" fill="rgba(0,212,255,0.7)" font-family="Share Tech Mono,monospace" font-size="9" letter-spacing="2">WALL SURFACE</text>
+
+          <!-- First cell: Δy₁ -->
+          <rect x="30" y="165" width="140" height="20" fill="rgba(0,255,157,0.12)" stroke="rgba(0,255,157,0.6)" stroke-width="1.2" stroke-dasharray="4 2"/>
+          <line x1="30" y1="185" x2="30" y2="148" stroke="rgba(0,255,157,0.5)" stroke-width="1" stroke-dasharray="3 2"/>
+          <line x1="170" y1="185" x2="170" y2="148" stroke="rgba(0,255,157,0.5)" stroke-width="1" stroke-dasharray="3 2"/>
+          <!-- Δy₁ arrows -->
+          <line x1="200" y1="165" x2="200" y2="185" stroke="rgba(0,255,157,0.9)" stroke-width="1.5" marker-end="url(#arr-green)" marker-start="url(#arr-green-r)"/>
+          <text x="210" y="177" fill="#00ff9d" font-family="Share Tech Mono,monospace" font-size="11" font-weight="bold">Δy₁</text>
+          <text x="210" y="190" fill="rgba(0,255,157,0.6)" font-family="Share Tech Mono,monospace" font-size="8">1st cell height</text>
+
+          <!-- Inflation cells -->
+          <rect x="30" y="145" width="140" height="20" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.3)" stroke-width="0.8"/>
+          <rect x="30" y="122" width="140" height="23" fill="rgba(0,212,255,0.04)" stroke="rgba(0,212,255,0.2)" stroke-width="0.8"/>
+          <rect x="30" y="96" width="140" height="26" fill="rgba(0,212,255,0.025)" stroke="rgba(0,212,255,0.15)" stroke-width="0.8"/>
+          <rect x="30" y="66" width="140" height="30" fill="rgba(0,212,255,0.015)" stroke="rgba(0,212,255,0.1)" stroke-width="0.8"/>
+
+          <!-- δ arrow -->
+          <line x1="185" y1="66" x2="185" y2="185" stroke="rgba(255,107,53,0.9)" stroke-width="1.5" marker-end="url(#arr-orange)" marker-start="url(#arr-orange-r)"/>
+          <text x="195" y="125" fill="#ff6b35" font-family="Share Tech Mono,monospace" font-size="11" font-weight="bold">δ</text>
+          <text x="194" y="138" fill="rgba(255,107,53,0.6)" font-family="Share Tech Mono,monospace" font-size="8">BL thickness</text>
+
+          <!-- Free-stream label -->
+          <text x="240" y="40" fill="rgba(203,232,255,0.5)" font-family="Share Tech Mono,monospace" font-size="9" letter-spacing="1">FREE-STREAM FLOW →</text>
+          <line x1="300" y1="50" x2="440" y2="50" stroke="rgba(203,232,255,0.2)" stroke-width="1" stroke-dasharray="6 3"/>
+
+          <!-- Growth rate label -->
+          <text x="30" y="58" fill="rgba(168,85,247,0.7)" font-family="Share Tech Mono,monospace" font-size="8">growth rate ~1.15–1.25</text>
+
+          <!-- Arrowhead markers -->
+          <defs>
+            <marker id="arr-green" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#00ff9d"/>
+            </marker>
+            <marker id="arr-green-r" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#00ff9d"/>
+            </marker>
+            <marker id="arr-orange" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#ff6b35"/>
+            </marker>
+            <marker id="arr-orange-r" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#ff6b35"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ APPLICATIONS ═══════════════════════════════════ -->
+  <div class="full-panel">
+    <div class="section-label">Applications</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="ii-icon">✈️</span>
+        <div>
+          <div class="ii-title">External Aerodynamics</div>
+          <div class="ii-desc">Wings, fuselages, cars. Typically y⁺ ≈ 1 with k-ω SST for accurate drag/lift prediction.</div>
+        </div>
+      </div>
+      <div class="info-item">
+        <span class="ii-icon">🔩</span>
+        <div>
+          <div class="ii-title">Internal Pipe &amp; Duct Flows</div>
+          <div class="ii-desc">Hydraulic diameter governs Re. Wall functions (y⁺ 30–300) reduce mesh count significantly.</div>
+        </div>
+      </div>
+      <div class="info-item">
+        <span class="ii-icon">🌡️</span>
+        <div>
+          <div class="ii-title">Heat Transfer Simulations</div>
+          <div class="ii-desc">Accurate y⁺ ≤ 5 required near heated walls to resolve thermal boundary layer gradients.</div>
+        </div>
+      </div>
+      <div class="info-item">
+        <span class="ii-icon">🔥</span>
+        <div>
+          <div class="ii-title">Combustion Chamber Walls</div>
+          <div class="ii-desc">Extreme temperature gradients demand very fine near-wall resolution (y⁺ ≈ 1).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer" style="margin-top:28px;">
+    <span class="disclaimer-icon">⚠️</span>
+    <p><strong>Disclaimer:</strong> This calculator uses empirical correlations (Prandtl turbulent flat-plate, Blasius) for <em>preliminary</em> CFD mesh estimation and educational purposes. Results should be validated through mesh independence studies and comparison with published reference data. Assumptions include fully-turbulent, smooth-wall, incompressible flow with zero pressure gradient.</p>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <span class="footer-tagline">This tool translates CFD flow physics into practical near-wall mesh parameters, bridging theory and real-world meshing decisions.</span>
+    Built for students, researchers &amp; entry-level engineers · ANSYS Fluent &amp; OpenFOAM compatible
+  </footer>
+
+</div><!-- /wrapper -->
+
+<script>
+// ═══════ PRESET BUTTONS ═══════
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('yplus').value = btn.dataset.val;
+  });
+});
+
+// ═══════ FLOW TYPE LABEL SWAP ═══════
+document.getElementById('flowtype').addEventListener('change', function () {
+  const ext = this.value === 'external';
+  document.getElementById('length-label').innerHTML =
+    ext ? 'Characteristic Length, L <span class="unit">m</span>'
+        : 'Hydraulic Diameter, D <span class="unit">m</span>';
+  document.getElementById('length-hint').textContent =
+    ext ? 'Chord / plate length for external flow.'
+        : 'Pipe or hydraulic diameter for internal flow.';
+});
+
+// ═══════ ACCORDION ═══════
+function toggleAcc(header) {
+  const body  = header.nextElementSibling;
+  const arrow = header.querySelector('.acc-arrow');
+  body.classList.toggle('open');
+  arrow.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+// ═══════ HELPERS ═══════
+function fmt(val, decimals=4) {
+  if (Math.abs(val) < 1e-3 || Math.abs(val) >= 1e5) {
+    return val.toExponential(decimals);
+  }
+  return val.toFixed(decimals);
+}
+function fmtSci(val) {
+  if (val === 0) return '0';
+  const exp = Math.floor(Math.log10(Math.abs(val)));
+  const coef = val / Math.pow(10, exp);
+  return `${coef.toFixed(3)} × 10<sup>${exp}</sup>`;
+}
+
+// ═══════ MAIN CALCULATION ═══════
+function calculate() {
+  const U   = parseFloat(document.getElementById('velocity').value);
+  const rho = parseFloat(document.getElementById('density').value);
+  const mu  = parseFloat(document.getElementById('viscosity').value);
+  const L   = parseFloat(document.getElementById('length').value);
+  const yp  = parseFloat(document.getElementById('yplus').value);
+  const ft  = document.getElementById('flowtype').value;
+
+  // Validation
+  const errors = [];
+  if (!U   || U   <= 0) errors.push('Free-stream velocity U must be positive.');
+  if (!rho || rho <= 0) errors.push('Density ρ must be positive.');
+  if (!mu  || mu  <= 0) errors.push('Dynamic viscosity μ must be positive.');
+  if (!L   || L   <= 0) errors.push(ft === 'external' ? 'Characteristic length L must be positive.' : 'Hydraulic diameter D must be positive.');
+  if (!yp  || yp  <= 0) errors.push('Desired y⁺ must be positive.');
+
+  if (errors.length) {
+    document.getElementById('output-content').innerHTML = `
+      <div style="padding:16px;">
+        ${errors.map(e => `<div class="warn-item danger"><span class="warn-icon">✖</span>${e}</div>`).join('')}
+      </div>`;
+    return;
+  }
+
+  // ── Calculations ──
+  const nu  = mu / rho;                         // kinematic viscosity
+  const Re  = rho * U * L / mu;                 // Reynolds number
+
+  const Cf  = ft === 'external'
+    ? 0.026 * Math.pow(Re, -1/7)               // Prandtl external turbulent
+    : 0.079 * Math.pow(Re, -0.25);             // Blasius internal
+
+  const tau_w = 0.5 * rho * U * U * Cf;        // wall shear stress
+  const u_tau = Math.sqrt(tau_w / rho);         // friction velocity
+  const dy1   = yp * mu / (rho * u_tau);        // first cell height
+  const dy1mm = dy1 * 1000;
+  const delta = 0.37 * L * Math.pow(Re, -0.2); // BL thickness (external)
+  const Mach  = U / 343;                        // rough Mach (air, 20°C)
+  const layers = Math.round(Math.log(delta / dy1) / Math.log(1.2)); // indicative
+
+  // ── Flow regime ──
+  let regime, regimeClass;
+  if (Re < 5e5)       { regime = 'Laminar';      regimeClass = 're-laminar'; }
+  else if (Re < 3e6)  { regime = 'Transitional'; regimeClass = 're-transition'; }
+  else                { regime = 'Turbulent';    regimeClass = 're-turbulent'; }
+
+  // ── Turbulence model ──
+  let turbModel, turbReason;
+  if (yp <= 2) {
+    turbModel  = 'k-ω SST &nbsp;/&nbsp; LES';
+    turbReason = 'y⁺ ≈ 1 resolves the viscous sublayer; wall functions are <strong>not required</strong>. This approach delivers highly accurate near-wall predictions for flows with adverse pressure gradients, separation, and heat transfer.';
+  } else if (yp <= 10) {
+    turbModel  = 'k-ω SST (enhanced wall treatment)';
+    turbReason = 'y⁺ ≈ 5 lies in the buffer layer. Use enhanced wall treatment in ANSYS Fluent, or wall functions with caution. k-ω SST remains the recommended choice for general-purpose turbulent CFD.';
+  } else if (yp <= 300) {
+    turbModel  = 'k-ε Realizable &nbsp;/&nbsp; Standard';
+    turbReason = 'y⁺ in the log-law region (30–300) allows use of standard wall functions, significantly reducing mesh count and computational cost. Suitable for high-Re industrial applications without strong pressure gradients.';
+  } else {
+    turbModel  = 'k-ε with Scalable Wall Functions';
+    turbReason = 'Very high y⁺ may degrade accuracy. Scalable wall functions (ANSYS Fluent) or nutkWallFunction (OpenFOAM) can handle y⁺ &gt; 300, but near-wall physics will be approximated. Consider refining mesh for critical regions.';
+  }
+
+  // ── Warnings ──
+  const warns = [];
+  if (yp < 1) {
+    warns.push({ type: 'warn', icon: '⚠️', msg: 'y⁺ &lt; 1 may significantly increase near-wall cell count and computational cost. Ensure this level of resolution is truly required.' });
+  }
+  if (Mach > 0.3) {
+    warns.push({ type: 'danger', icon: '🚨', msg: `Mach ≈ ${Mach.toFixed(2)} — compressibility effects are significant. Empirical incompressible correlations used here may underestimate wall shear stress.` });
+  }
+  if (ft === 'external' && dy1 > delta) {
+    warns.push({ type: 'danger', icon: '🚨', msg: 'First cell height (Δy₁) exceeds estimated boundary layer thickness (δ). The entire boundary layer would be inside a single cell — meshing will be ineffective.' });
+  }
+  if (Re < 5e5) {
+    warns.push({ type: 'info', icon: 'ℹ️', msg: `Re ≈ ${fmtSci(Re)} — flow may be laminar. Turbulent skin-friction correlations overestimate Cf in this regime. Verify turbulence assumption.` });
+  }
+  if (yp > 300) {
+    warns.push({ type: 'warn', icon: '⚠️', msg: 'y⁺ &gt; 300 may exceed the log-law region. Near-wall accuracy will be compromised, especially in separating flows or heat transfer simulations.' });
+  }
+
+  const warnHTML = warns.length
+    ? `<div class="warnings-box fade-in">${warns.map(w =>
+        `<div class="warn-item ${w.type}"><span class="warn-icon">${w.icon}</span>${w.msg}</div>`).join('')}</div>`
+    : '';
+
+  // ── Suggested layer count (clamped) ──
+  const suggestedLayers = Math.max(15, Math.min(35, isFinite(layers) ? layers : 20));
+
+  // ── Build HTML ──
+  const html = `
+    <div class="fade-in">
+      <div class="output-grid">
+
+        <!-- Reynolds Number -->
+        <div class="output-card" data-tip="Re = ρUL/μ — governs flow regime and boundary layer behaviour.">
+          <div class="oc-label">Reynolds Number</div>
+          <div class="oc-value" id="re-val">${fmtSci(Re)}</div>
+          <div class="oc-sub">
+            <span class="re-badge ${regimeClass}">${regime}</span>
+          </div>
+          <div class="oc-hint">
+            <strong>Legend:</strong> Laminar &lt;5×10⁵ · Transitional 5×10⁵–3×10⁶ · Turbulent &gt;3×10⁶
+          </div>
+        </div>
+
+        <!-- Skin Friction Coefficient -->
+        <div class="output-card" data-tip="Empirical Cf based on flow type and Re.">
+          <div class="oc-label">Skin Friction Coefficient Cƒ</div>
+          <div class="oc-value">${fmt(Cf, 6)}</div>
+          <div class="oc-sub">Dimensionless</div>
+          <div class="oc-hint">Prandtl (external) or Blasius (internal) empirical correlation.</div>
+        </div>
+
+        <!-- Wall Shear Stress -->
+        <div class="output-card" data-tip="τ_w = ½ρU²Cƒ — shear force per unit area at the wall.">
+          <div class="oc-label">Wall Shear Stress τ_w</div>
+          <div class="oc-value">${fmt(tau_w, 4)} <span style="font-size:0.8rem;opacity:0.7">Pa</span></div>
+          <div class="oc-sub">N/m²</div>
+          <div class="oc-hint">Drives friction drag on the surface.</div>
+        </div>
+
+        <!-- Friction Velocity -->
+        <div class="output-card" data-tip="u_τ = √(τ_w/ρ) — velocity scale for near-wall turbulence.">
+          <div class="oc-label">Friction Velocity u_τ</div>
+          <div class="oc-value">${fmt(u_tau, 5)} <span style="font-size:0.8rem;opacity:0.7">m/s</span></div>
+          <div class="oc-sub">Wall velocity scale</div>
+          <div class="oc-hint">Used to non-dimensionalise near-wall quantities.</div>
+        </div>
+
+        <!-- First Cell Height -->
+        <div class="output-card highlight" data-tip="Δy₁ = y⁺·ν/u_τ — distance from wall to centre of first mesh cell.">
+          <div class="oc-label">First Cell Height Δy₁</div>
+          <div class="oc-value">${fmt(dy1, 6)} <span style="font-size:0.8rem;opacity:0.7">m</span></div>
+          <div class="oc-sub">${fmt(dy1mm, 5)} mm</div>
+          <div class="oc-hint">
+            <strong>ANSYS Meshing:</strong> Enter as <em>First Layer Height</em> in Inflation settings.<br>
+            <strong>OpenFOAM:</strong> Use as <code>firstLayerThickness</code> in <em>snappyHexMeshDict</em>.
+          </div>
+        </div>
+
+        <!-- Boundary Layer Thickness -->
+        <div class="output-card highlight" data-tip="δ = 0.37L·Re^(-1/5) — turbulent BL estimate (Prandtl 1/7-power).">
+          <div class="oc-label">Boundary Layer Thickness δ</div>
+          <div class="oc-value">${fmt(delta, 5)} <span style="font-size:0.8rem;opacity:0.7">m</span></div>
+          <div class="oc-sub">${fmt(delta*1000, 3)} mm</div>
+          <div class="oc-hint">
+            Set total inflation thickness ≥ this value to fully resolve the boundary layer.
+            <div class="bl-extras">
+              <span class="bl-chip">Growth rate: 1.15–1.25</span>
+              <span class="bl-chip">Layers: ~${suggestedLayers}</span>
+            </div>
+            <span style="color:var(--text-muted);font-size:0.7rem;">Lower growth rates improve near-wall gradient resolution.</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Turbulence Model Recommendation -->
+      <div class="turb-box fade-in" style="margin-top:18px;">
+        <div class="tb-label">Recommended Turbulence Model</div>
+        <div class="tb-model">⚡ ${turbModel}</div>
+        <div class="tb-reason">${turbReason}</div>
+      </div>
+
+      ${warnHTML}
+
+      <!-- Quick CFD Workflow Summary -->
+      <div style="margin-top:18px;padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius);font-size:0.78rem;color:var(--text-muted);line-height:1.7;">
+        <strong style="color:var(--text-dim);">Quick Workflow:</strong>
+        Set first cell = <code style="color:var(--accent2)">${fmt(dy1mm,4)} mm</code> ·
+        Growth rate ≈ <code style="color:var(--accent2)">1.2</code> ·
+        Target ~<code style="color:var(--accent2)">${suggestedLayers} layers</code> ·
+        Total inflation ≈ <code style="color:var(--accent2)">${fmt(delta*1000,2)} mm</code>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('output-content').innerHTML = html;
+}
+</script>
+</body>
+</html>
